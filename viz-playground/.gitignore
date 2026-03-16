@@ -1,0 +1,25 @@
+# R artifacts
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# Working notes
+clauded.md
+
+# Temp/empty folders
+Nova pasta/
+Nova pasta (2)/
+Nova pasta (3)/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*~
+.vscode/
+.idea/
+.vercel

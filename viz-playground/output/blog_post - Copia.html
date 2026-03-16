@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What Predicts Claude Usage Across Countries?</title>
+  <style>
+    body { font-family: Georgia, serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.7; color: #333; }
+    h1 { font-size: 2em; margin-bottom: 0.5em; }
+    h2 { font-size: 1.4em; margin-top: 2em; border-bottom: 1px solid #ddd; padding-bottom: 0.3em; }
+    .table { border-collapse: collapse; margin: 1.5em 0; font-size: 0.9em; }
+    .table th, .table td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+    .table th { background: #f5f5f5; }
+    .table tr:nth-child(even) { background: #fafafa; }
+    caption { font-weight: bold; margin-bottom: 0.5em; text-align: left; }
+    img { max-width: 100%; margin: 1.5em 0; }
+    .stat { background: #f0f7ff; padding: 15px; border-left: 4px solid #3b82f6; margin: 1.5em 0; }
+    code { background: #f5f5f5; padding: 2px 6px; font-size: 0.9em; }
+    .footnote { font-size: 0.85em; color: #666; margin-top: 3em; padding-top: 1em; border-top: 1px solid #ddd; }
+    .sig-note { font-size: 0.8em; color: #666; }
+  </style>
+</head>
+<body>
+
+<h1>What Predicts Claude Usage Across Countries?</h1>
+<p><em>Some curious patterns in the Anthropic Economic Index</em></p>
+
+<p>Anthropic released their Economic Index recently—one of the first public datasets on actual AI assistant usage at the country level. I played with it over a weekend. A few patterns emerged that seem worth noting, though I want to be careful about over-interpreting cross-country regressions with n ≈ 100.</p>
+
+<h2>The standard correlates</h2>
+
+<p>The report notes that Claude usage tracks GDP, internet penetration, and governance quality. This is unsurprising and probably robust. Richer countries with better infrastructure adopt new technologies faster. We've known this since, what, Rosenstein-Rodan?</p>
+
+<p>The question that interested me: which of these factors do independent work? They're all correlated. GDP predicts governance. Governance predicts R&D spending. R&D spending predicts education. The usual development cluster.</p>
+
+<p>Separating signal from collinearity requires some regularization.</p>
+
+<h2>Regression results</h2>
+
+<p>I threw 19 World Bank indicators into a series of specifications:</p>
+
+<h3>Table 1: Model Comparison</h3>
+<table class='table'><thead><tr><th>Model</th><th>N</th><th>R²</th><th>Adj R²</th></tr></thead><tbody><tr><td>(1) GDP only</td><td>103</td><td>0.756</td><td>0.754</td></tr>
+<tr><td>(2) + Internet, Reg.</td><td>103</td><td>0.784</td><td>0.777</td></tr>
+<tr><td>(3) + Fertility, Aging</td><td>103</td><td>0.854</td><td>0.848</td></tr>
+<tr><td>(4) Core model</td><td>103</td><td>0.862</td><td>0.853</td></tr>
+<tr><td>(5) Kitchen sink</td><td>103</td><td>0.875</td><td>0.846</td></tr></tbody></table>
+
+<h3>Table 2: Core Model Coefficients</h3>
+<table class='table'><thead><tr><th>Variable</th><th>Coefficient</th><th>Std. Error</th><th>t-stat</th><th>p-value</th><th> </th></tr></thead><tbody><tr><td>(Intercept)</td><td>-4.349</td><td>0.500</td><td>-8.69</td><td>0.0000</td><td>***</td></tr>
+<tr><td>log_gdp</td><td> 0.166</td><td>0.103</td><td> 1.62</td><td>0.1092</td><td></td></tr>
+<tr><td>fertility</td><td>-0.206</td><td>0.035</td><td>-5.85</td><td>0.0000</td><td>***</td></tr>
+<tr><td>aging</td><td> 0.007</td><td>0.004</td><td> 1.54</td><td>0.1257</td><td></td></tr>
+<tr><td>regulatory_quality</td><td> 0.121</td><td>0.053</td><td> 2.28</td><td>0.0249</td><td>*</td></tr>
+<tr><td>rd_spending</td><td> 0.055</td><td>0.024</td><td> 2.29</td><td>0.0243</td><td>*</td></tr>
+<tr><td>life_expectancy</td><td> 0.002</td><td>0.007</td><td> 0.32</td><td>0.7479</td><td></td></tr></tbody></table>
+<p class="sig-note">† p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001</p>
+
+<p>The full model has the usual problems—coefficient instability, likely overfitting. LASSO helps here.</p>
+
+<h3>Table 3: LASSO Selection</h3>
+<p>Variables surviving L1 regularization (10-fold CV):</p>
+<table class='table'><thead><tr><th>Variable</th><th>Coefficient</th></tr></thead><tbody><tr><td>fertility</td><td>-0.1763</td></tr>
+<tr><td>log_gdp</td><td> 0.1037</td></tr>
+<tr><td>regulatory_quality</td><td> 0.0887</td></tr>
+<tr><td>aging</td><td> 0.0518</td></tr>
+<tr><td>rd_spending</td><td> 0.0473</td></tr>
+<tr><td>mobile</td><td> 0.0206</td></tr>
+<tr><td>life_expectancy</td><td> 0.0125</td></tr>
+<tr><td>hightech_exports</td><td> 0.0010</td></tr></tbody></table>
+<p class="stat">LASSO R² = 86.5%</p>
+
+<p>The result I didn't expect: <strong>fertility rate is the strongest predictor</strong>. Negative coefficient—lower fertility, higher Claude usage. This holds after controlling for GDP, governance, R&D, and the rest.</p>
+
+<p>What to make of this? A few possibilities. Low fertility correlates with aging populations and labor scarcity, which might increase demand for productivity tools. Or it's proxying for something cultural about time orientation and technology adoption. Or it's noise—100 countries isn't that many observations. I lean toward the labor scarcity story but wouldn't bet heavily on it.</p>
+
+<p>Variables that got zeroed out: internet access, tertiary education, corruption control. They're correlated with the survivors but don't add independent signal. Suggestive, but again, small n.</p>
+
+<img src="lasso_variable_importance.png" alt="LASSO coefficients">
+
+<h2>Residual analysis</h2>
+
+<p>Who uses Claude more than their GDP predicts?</p>
+
+<h3>Overperformers</h3>
+<table class='table'><thead><tr><th>Country</th><th>Residual</th></tr></thead><tbody><tr><td>Georgia</td><td>0.52</td></tr>
+<tr><td>Israel</td><td>0.44</td></tr>
+<tr><td>Sri Lanka</td><td>0.42</td></tr>
+<tr><td>Armenia</td><td>0.41</td></tr>
+<tr><td>Montenegro</td><td>0.40</td></tr>
+<tr><td>Nepal</td><td>0.39</td></tr>
+<tr><td>Tunisia</td><td>0.38</td></tr>
+<tr><td>Ukraine</td><td>0.35</td></tr>
+<tr><td>South Korea</td><td>0.34</td></tr>
+<tr><td>Moldova</td><td>0.33</td></tr></tbody></table>
+
+<h3>Underperformers</h3>
+<table class='table'><thead><tr><th>Country</th><th>Residual</th></tr></thead><tbody><tr><td>Angola</td><td>-0.88</td></tr>
+<tr><td>Tanzania</td><td>-0.60</td></tr>
+<tr><td>Uzbekistan</td><td>-0.58</td></tr>
+<tr><td>Qatar</td><td>-0.53</td></tr>
+<tr><td>Tajikistan</td><td>-0.44</td></tr>
+<tr><td>Botswana</td><td>-0.37</td></tr>
+<tr><td>Burundi</td><td>-0.35</td></tr>
+<tr><td>Kazakhstan</td><td>-0.35</td></tr>
+<tr><td>Mexico</td><td>-0.34</td></tr>
+<tr><td>Azerbaijan</td><td>-0.31</td></tr></tbody></table>
+
+<p>The overperformer list is interesting: several post-Soviet states (Georgia, Armenia, Ukraine, Moldova), some South Asian countries (Nepal, Sri Lanka). Common thread might be: strong technical education traditions, English proficiency, maybe diaspora effects. Or maybe I'm pattern-matching too hard.</p>
+
+<p>Underperformers include resource-extraction economies and countries with internet restrictions. The Turkmenistan result is almost too large to be informative—there's probably something mechanical going on there.</p>
+
+<img src="gdp_residuals.png" alt="GDP residuals">
+
+<h2>Survey vs. revealed preference</h2>
+
+<p>This is where it gets strange. BCG surveyed 21 countries about ChatGPT usage. I matched this to the Claude data.</p>
+
+<p class="stat">Correlation between self-reported AI use and actual Claude usage: <strong>r = -0.43</strong></p>
+
+<p>Negative. India reports the highest ChatGPT adoption (45%) but has low Claude usage per capita. The pattern holds for Indonesia, Brazil, South Africa.</p>
+
+<p>The obvious objection: ChatGPT ≠ Claude. Maybe there's product substitution—India uses ChatGPT, not Claude. That's plausible. But the magnitude of divergence is still striking. There may also be survey response effects—a literature on over-reporting of aspirational behaviors in certain survey contexts.</p>
+
+<p>I don't want to over-claim here. The data sources aren't measuring the same thing. But it's a pattern worth flagging for anyone doing AI adoption forecasting from survey data.</p>
+
+<img src="survey_vs_actual_usage.png" alt="Survey vs actual">
+
+<h2>The attitude paradox</h2>
+
+<p>Ipsos tracks whether people feel "excited" or "nervous" about AI. Natural hypothesis: excitement predicts adoption.</p>
+
+<p class="stat">Correlation between AI excitement and Claude usage: <strong>r = -0.6</strong></p>
+
+<p>Also negative. Thailand is 80% excited, low usage. Australia is 40% excited/69% nervous, high usage.</p>
+
+<p>This is probably confounded by development level. Rich countries are both more skeptical of technology hype and better positioned to use the technology. The skeptics with infrastructure outadopt the enthusiasts without it. Standard stuff, but worth stating explicitly since it cuts against a natural assumption.</p>
+
+<img src="perception_quadrant.png" alt="Perception quadrant">
+
+<h2>Automation vs. augmentation</h2>
+
+<p>The AEI data includes a classification of conversations as "automation" (AI doing the task) vs "augmentation" (AI helping with the task). I expected this to be stable across countries. It's not.</p>
+
+<h3>Highest Automation</h3>
+<table class='table'><thead><tr><th>Country</th><th>Automation %</th><th>Augmentation %</th></tr></thead><tbody><tr><td>Pakistan</td><td>64.1</td><td>35.9</td></tr>
+<tr><td>Brazil</td><td>63.9</td><td>36.1</td></tr>
+<tr><td>Rwanda</td><td>62.7</td><td>37.3</td></tr>
+<tr><td>Benin</td><td>62.3</td><td>37.7</td></tr>
+<tr><td>Cambodia</td><td>61.1</td><td>38.9</td></tr></tbody></table>
+
+<h3>Highest Augmentation</h3>
+<table class='table'><thead><tr><th>Country</th><th>Automation %</th><th>Augmentation %</th></tr></thead><tbody><tr><td>Japan</td><td>43.3</td><td>56.7</td></tr>
+<tr><td>Norway</td><td>43.9</td><td>56.1</td></tr>
+<tr><td>Denmark</td><td>44.1</td><td>55.9</td></tr>
+<tr><td>South Korea</td><td>44.5</td><td>55.5</td></tr>
+<tr><td>Finland</td><td>44.6</td><td>55.4</td></tr></tbody></table>
+
+<p class="stat">Correlation between GDP and automation rate: <strong>r = -0.83</strong></p>
+
+<p>This is a strong correlation for cross-country work. The pattern: poorer countries use Claude more for replacement; richer countries more for enhancement.</p>
+
+<p>The labor economics interpretation seems natural. In labor-abundant economies, the marginal product of skilled labor is high relative to wages, so automating skilled tasks creates value. In labor-scarce economies, the constraint is different—you're trying to make existing workers more productive rather than replace them.</p>
+
+<p>If this holds up, it has implications for how AI affects labor markets differently across development levels. The "AI as job replacement" frame may be more accurate for emerging markets; the "AI as productivity tool" frame may be more accurate for high-income countries. Though I'd want much more data before making strong claims.</p>
+
+<img src="gdp_vs_automation.png" alt="GDP vs automation">
+
+<h2>Takeaways</h2>
+
+<p>Some tentative observations:</p>
+
+<p><strong>Demographics matter.</strong> The fertility result is robust enough to take seriously, even if the mechanism is unclear. Aging, labor-scarce societies adopt AI tools faster. This probably has implications for thinking about AI policy across different demographic contexts.</p>
+
+<p><strong>Stated preferences diverge from revealed preferences.</strong> Country-level survey data on AI adoption may not track actual usage patterns. This should inform how much weight we put on attitude surveys when forecasting adoption.</p>
+
+<p><strong>Use patterns differ as much as adoption rates.</strong> The automation/augmentation split, the directive vs. learning collaboration styles—these suggest that "AI adoption" is not a single phenomenon. How a country uses AI may matter as much as whether it does.</p>
+
+<p><strong>The development literature applies.</strong> A lot of what drives AI adoption is the same stuff that drives technology adoption generally: income, infrastructure, institutions. No special AI sauce required to explain the cross-country patterns. Maybe that's not surprising, but it's grounding.</p>
+
+<hr>
+
+<p>This was a useful dataset to explore. Anthropic releasing it enables exactly this kind of analysis, and there's not much comparable data available elsewhere. The patterns here are preliminary—more time periods and larger samples would help—but they're suggestive enough to be worth documenting.</p>
+
+<p class="footnote"><em>Methods: LASSO and elastic net regression with 10-fold CV, n = 103 countries. Data: Anthropic Economic Index, World Bank WDI, Ipsos AI Monitor 2024, BCG Global Consumer Survey 2023. Code available on request.</em></p>
+
+</body>
+</html>

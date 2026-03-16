@@ -1,0 +1,32 @@
+country,geo_id,excited,nervous
+Sweden,SWE,32,53
+Belgium,BEL,35,50
+France,FRA,36,52
+Canada,CAN,36,63
+United States,USA,36,63
+Ireland,IRL,38,62
+Australia,AUS,40,69
+Netherlands,NLD,42,50
+United Kingdom,GBR,42,65
+Germany,DEU,43,46
+New Zealand,NZL,43,63
+Hungary,HUN,45,46
+Argentina,ARG,46,46
+Poland,POL,50,38
+Italy,ITA,50,50
+Spain,ESP,50,51
+Japan,JPN,51,23
+Chile,CHL,51,54
+South Africa,ZAF,59,53
+Colombia,COL,62,45
+Romania,ROU,62,50
+Singapore,SGP,65,53
+Brazil,BRA,66,51
+India,IND,66,58
+Peru,PER,72,47
+Mexico,MEX,74,48
+Turkey,TUR,74,54
+Malaysia,MYS,74,55
+Indonesia,IDN,75,48
+South Korea,KOR,76,44
+Thailand,THA,80,57

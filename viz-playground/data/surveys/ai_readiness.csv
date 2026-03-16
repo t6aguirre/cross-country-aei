@@ -1,0 +1,59 @@
+country,geo_id,ai_readiness_score,ai_readiness_rank
+United States,USA,87.03,1
+Singapore,SGP,84.25,2
+South Korea,KOR,79.98,3
+France,FRA,79.36,4
+United Kingdom,GBR,78.88,5
+Canada,CAN,78.50,6
+Netherlands,NLD,77.80,7
+Germany,DEU,77.20,8
+Finland,FIN,76.90,9
+Australia,AUS,76.50,10
+Norway,NOR,75.80,11
+Japan,JPN,75.50,12
+United Arab Emirates,ARE,75.20,13
+Sweden,SWE,74.80,14
+Denmark,DNK,74.50,15
+Switzerland,CHE,74.20,16
+New Zealand,NZL,73.80,17
+Belgium,BEL,73.20,18
+Austria,AUT,72.80,19
+Ireland,IRL,72.50,20
+Estonia,EST,71.50,21
+Israel,ISR,71.00,22
+China,CHN,70.50,23
+Spain,ESP,68.50,24
+Italy,ITA,67.20,25
+Portugal,PRT,66.80,26
+Czechia,CZE,65.50,27
+Poland,POL,64.80,28
+Slovenia,SVN,64.20,29
+Lithuania,LTU,63.80,30
+Hungary,HUN,62.50,31
+Latvia,LVA,62.00,32
+Malaysia,MYS,61.50,33
+Chile,CHL,60.80,34
+Greece,GRC,60.20,35
+Slovakia,SVK,59.80,36
+Croatia,HRV,59.20,37
+Romania,ROU,58.50,38
+Russia,RUS,58.00,39
+Saudi Arabia,SAU,57.50,40
+Thailand,THA,56.80,41
+Brazil,BRA,56.20,42
+Mexico,MEX,55.50,43
+Turkey,TUR,55.00,44
+Argentina,ARG,54.50,45
+India,IND,54.00,46
+South Africa,ZAF,52.91,47
+Colombia,COL,52.00,48
+Indonesia,IDN,51.50,49
+Philippines,PHL,50.80,50
+Vietnam,VNM,50.20,51
+Peru,PER,49.50,52
+Ukraine,UKR,48.50,54
+Egypt,EGY,45.00,60
+Kenya,KEN,44.50,62
+Nigeria,NGA,42.00,70
+Pakistan,PAK,38.00,85
+Bangladesh,BGD,36.50,90

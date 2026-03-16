@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What Predicts AI Usage Across Countries?</title>
+  <style>
+    body { font-family: "Palatino Linotype", Georgia, serif; max-width: 820px; margin: 50px auto; padding: 0 25px; line-height: 1.75; color: #2a2a2a; }
+    h1 { font-size: 2.1em; margin-bottom: 0.3em; font-weight: 600; }
+    h2 { font-size: 1.35em; margin-top: 2.2em; border-bottom: 2px solid #e0e0e0; padding-bottom: 0.4em; color: #1a1a1a; }
+    h3 { font-size: 1.05em; margin-top: 1.5em; color: #444; font-weight: 600; }
+    p { margin: 1em 0; }
+    .subtitle { font-size: 1.1em; color: #666; margin-bottom: 2em; font-style: italic; }
+
+    /* Nice regression tables */
+    .reg-table {
+      border-collapse: collapse;
+      margin: 1.5em 0;
+      font-size: 0.88em;
+      font-family: "SF Mono", Consolas, monospace;
+      width: 100%;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .reg-table th {
+      background: linear-gradient(180deg, #f8f9fa 0%, #f1f3f4 100%);
+      padding: 12px 14px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 2px solid #dee2e6;
+      font-size: 0.9em;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: #495057;
+    }
+    .reg-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .reg-table tr:hover { background: #f8f9fa; }
+    .reg-table tr:last-child td { border-bottom: none; }
+    caption {
+      font-weight: 600;
+      margin-bottom: 0.6em;
+      text-align: left;
+      font-size: 0.95em;
+      color: #333;
+    }
+
+    img { max-width: 100%; margin: 1.8em 0; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .stat {
+      background: linear-gradient(135deg, #f0f7ff 0%, #e8f4fd 100%);
+      padding: 16px 20px;
+      border-left: 4px solid #3b82f6;
+      margin: 1.5em 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.95em;
+    }
+    .stat strong { color: #1e40af; }
+    code { background: #f1f3f4; padding: 2px 7px; font-size: 0.88em; border-radius: 3px; }
+    .footnote { font-size: 0.82em; color: #666; margin-top: 3em; padding-top: 1.5em; border-top: 1px solid #ddd; }
+    .sig-note { font-size: 0.78em; color: #888; margin-top: -0.5em; font-style: italic; }
+    hr { border: none; border-top: 1px solid #e0e0e0; margin: 2.5em 0; }
+    .references { font-size: 0.85em; line-height: 1.6; }
+    .references p { margin: 0.6em 0; padding-left: 2em; text-indent: -2em; }
+
+    /* Stylized facts box */
+    .stylized-facts {
+      background: #fafafa;
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
+      padding: 24px 28px;
+      margin: 2em 0;
+    }
+    .stylized-facts h2 {
+      margin-top: 0;
+      border-bottom: none;
+      font-size: 1.1em;
+      color: #333;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .stylized-facts ol {
+      margin: 0;
+      padding-left: 1.2em;
+    }
+    .stylized-facts li {
+      margin: 0.8em 0;
+      padding-left: 0.3em;
+    }
+    .stylized-facts .fact-stat {
+      font-family: "SF Mono", Consolas, monospace;
+      background: #fff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.9em;
+      color: #1e40af;
+      border: 1px solid #e0e7ff;
+    }
+  </style>
+</head>
+<body>
+
+<h1>What Predicts AI Usage Across Countries?</h1>
+<p class="subtitle">An informal analysis of the Anthropic Economic Index</p>
+
+<p>Anthropic put out their Economic Index a few weeks back—one of the first public datasets on actual AI assistant usage at the country level. Spent a weekend poking at it. Some patterns came up that seemed interesting enough to write down, with the usual caveats about cross-country regressions and small samples.</p>
+
+<p style="font-size: 0.92em; color: #555;"><strong>A note on representativeness:</strong> This is Claude data, not all AI. ChatGPT dominates the consumer market (~60% share vs Claude's ~3-4%). But the skew may be informative: <a href="https://empiricrafting.substack.com/p/one-llm-to-rule-them-all">Fradkin (2025)</a> finds Claude is disproportionately a "work-focused productivity tool"—36% of Claude conversations are coding vs 4% for ChatGPT. So this data likely captures the professional/productivity slice of AI adoption better than recreational use. For enterprise specifically, <a href="https://a16z.com/ai-enterprise-2025/">a16z's 2025 CIO survey</a> puts Anthropic as a top-three vendor alongside OpenAI and Google.</p>
+
+<div class="stylized-facts">
+<h2>Stylized Facts</h2>
+<ol>
+<li><strong>Fertility rate is the strongest predictor of Claude usage</strong>—negative coefficient survives LASSO. Countries with fewer children use AI more, controlling for GDP, governance, R&D, and 20 other variables.</li>
+<li><strong>Poorer countries automate; richer countries augment.</strong> GDP correlates with automation rate at <span class="fact-stat">r = -0.83</span>. Pakistan uses Claude for task replacement (64% automation); Japan uses it for task enhancement (57% augmentation).</li>
+<li><strong>Survey enthusiasm inversely predicts actual usage.</strong> Self-reported AI adoption correlates with Claude usage at <span class="fact-stat">r = -0.43</span>. Countries most excited about AI use it least.</li>
+<li><strong>83% of cross-country variance is explained</strong> by five predictors: GDP, regulatory quality, fertility, aging, and R&D spending. Standard development economics works.</li>
+</ol>
+</div>
+
+<h2>The standard correlates</h2>
+
+<p>The report notes Claude usage tracks GDP, internet penetration, and governance quality. Not shocking. Richer countries with better infrastructure adopt new tech faster—we've known this since Rosenstein-Rodan, or whenever.</p>
+
+<p>What I was more curious about: which of these actually do independent work? They're all correlated with each other. GDP predicts governance, governance predicts R&D, R&D predicts education. The usual development cluster. Separating signal from multicollinearity takes some regularization.</p>
+
+<h2>Regression results</h2>
+
+<p>Threw 23 indicators at it—World Bank development variables, plus HDI, GDP volatility, and IMF's routine task intensity index. Here's what falls out:</p>
+
+<h3>Table 1: OLS Estimates of Log Claude Usage per Capita</h3>
+<table class='reg-table'><thead><tr><th></th><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th><th>(8)</th></tr></thead><tbody><tr><td>Log GDP per capita</td><td>0.748***</td><td>0.374***</td><td>0.101</td><td>0.062</td><td>0.017</td><td>-0.013</td><td>0.135</td><td>0.084</td></tr>
+<tr><td></td><td>(0.047)</td><td>(0.08)</td><td>(0.078)</td><td>(0.076)</td><td>(0.077)</td><td>(0.09)</td><td>(0.109)</td><td>(0.109)</td></tr>
+<tr><td>Regulatory quality</td><td></td><td>0.289***</td><td>0.268***</td><td>0.242***</td><td>0.212***</td><td>0.213***</td><td>0.077</td><td>0.053</td></tr>
+<tr><td></td><td></td><td>(0.053)</td><td>(0.045)</td><td>(0.044)</td><td>(0.045)</td><td>(0.045)</td><td>(0.055)</td><td>(0.054)</td></tr>
+<tr><td>Fertility rate</td><td></td><td></td><td>-0.212***</td><td>-0.176***</td><td>-0.202***</td><td>-0.19***</td><td>-0.202***</td><td>-0.154***</td></tr>
+<tr><td></td><td></td><td></td><td>(0.03)</td><td>(0.031)</td><td>(0.032)</td><td>(0.037)</td><td>(0.043)</td><td>(0.047)</td></tr>
+<tr><td>Population 65+</td><td></td><td></td><td></td><td>0.013***</td><td>0.01**</td><td>0.01**</td><td>0.006</td><td>0.008*</td></tr>
+<tr><td></td><td></td><td></td><td></td><td>(0.004)</td><td>(0.004)</td><td>(0.004)</td><td>(0.005)</td><td>(0.005)</td></tr>
+<tr><td>R&D spending (% GDP)</td><td></td><td></td><td></td><td></td><td>0.066**</td><td>0.064**</td><td>0.082***</td><td>0.08***</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td>(0.027)</td><td>(0.027)</td><td>(0.027)</td><td>(0.026)</td></tr>
+<tr><td>Life expectancy</td><td></td><td></td><td></td><td></td><td></td><td>0.005</td><td>-0.004</td><td>0.001</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td>(0.007)</td><td>(0.009)</td><td>(0.009)</td></tr>
+<tr><td>English proficiency (EF EPI)</td><td></td><td></td><td></td><td></td><td></td><td></td><td>0.001</td><td>0.001**</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>(0.001)</td><td>(0.001)</td></tr>
+<tr><td>Mobile subscriptions</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>0.002**</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>(0.001)</td></tr></tbody></table>
+<table class='reg-table'><thead><tr><th></th><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6)</th><th>(7)</th><th>(8)</th></tr></thead><tbody><tr><td>N</td><td>127</td><td>127</td><td>127</td><td>127</td><td>127</td><td>127</td><td>90</td><td>90</td></tr>
+<tr><td>R²</td><td>0.668</td><td>0.733</td><td>0.812</td><td>0.826</td><td>0.834</td><td>0.834</td><td>0.829</td><td>0.839</td></tr>
+<tr><td>Adj. R²</td><td>0.666</td><td>0.729</td><td>0.807</td><td>0.82</td><td>0.827</td><td>0.826</td><td>0.814</td><td>0.823</td></tr></tbody></table>
+<p class="sig-note">Standard errors in parentheses. * p < 0.1, ** p < 0.05, *** p < 0.01</p>
+
+<p>The pattern is clear enough: fertility and aging add substantial explanatory power beyond GDP and governance. The core model in columns (1)-(6) uses 127 countries; columns (7)-(8) restrict to the 90 countries with EF English Proficiency Index coverage. English proficiency is significant in the full specification (column 8), and LASSO confirms roughly the same variable selection across both samples.</p>
+
+<h3>LASSO Variable Selection</h3>
+
+<img src="figures/lasso_variable_importance.png" alt="LASSO variable importance">
+
+<p>The result I didn't expect: <strong>fertility rate is the strongest predictor</strong>. Negative coefficient—lower fertility, higher Claude usage. This holds after controlling for GDP, governance, R&D, and the rest.</p>
+
+<p>What to make of this? A few possibilities. Low fertility correlates with aging populations and labor scarcity, which might increase demand for productivity tools. Or it's proxying for something cultural about time orientation and technology adoption. Or it's noise—127 countries isn't that many observations. I lean toward the labor scarcity story but wouldn't bet heavily on it.</p>
+
+<p><strong>English proficiency</strong> (measured by the EF English Proficiency Index) also survives regularization with a positive coefficient. Countries where more people speak English use Claude more, which makes sense given the model's training but is worth quantifying. This variable captures L1 and L2 speakers combined—not just Anglophone countries—so the effect is broader than just native English speakers.</p>
+
+<p>Variables that got zeroed out: internet access, tertiary education, corruption control. They're correlated with the survivors but don't add independent signal. Suggestive, but again, small n.</p>
+
+<h3>Shapley Decomposition</h3>
+
+<p>LASSO tells us which variables survive regularization, but not how much of the explained variance each contributes. For that, we need Shapley values—a game-theoretic method that fairly allocates R² to each predictor by averaging over all possible orderings. This handles multicollinearity properly.</p>
+
+<img src="figures/shapley_decomposition.png" alt="Shapley decomposition">
+
+<p>GDP alone accounts for the largest share of explained variance, but fertility and regulatory quality together contribute nearly as much. The demographic variables (fertility + aging) jointly explain about as much as governance. This confirms fertility isn't just noise—it's doing real explanatory work independent of the development cluster.</p>
+
+<h2>Residual analysis</h2>
+
+<p>Table 2 shows countries that deviate most from the fitted values in Column (5)—i.e., after controlling for GDP, governance, demographics, and R&D. This is more informative than simple GDP residuals, since we're asking: who outperforms <em>conditional on observable fundamentals</em>?</p>
+
+<h3>Table 2: Overperformers (Positive Residuals from Column 5)</h3>
+<table class='reg-table'><thead><tr><th>Country</th><th>Residual</th><th>Anglo</th><th>ExSov</th><th>Small</th></tr></thead><tbody><tr><td>Israel</td><td>0.634</td><td></td><td></td><td>Yes</td></tr>
+<tr><td>Iraq</td><td>0.507</td><td></td><td></td><td></td></tr>
+<tr><td>Armenia</td><td>0.398</td><td></td><td>Yes</td><td></td></tr>
+<tr><td>Montenegro</td><td>0.380</td><td></td><td></td><td></td></tr>
+<tr><td>Ecuador</td><td>0.377</td><td></td><td></td><td></td></tr>
+<tr><td>Bolivia</td><td>0.373</td><td></td><td></td><td></td></tr>
+<tr><td>Sri Lanka</td><td>0.372</td><td></td><td></td><td></td></tr>
+<tr><td>Nigeria</td><td>0.361</td><td>Yes</td><td></td><td></td></tr>
+<tr><td>Georgia</td><td>0.317</td><td></td><td>Yes</td><td></td></tr>
+<tr><td>Kenya</td><td>0.304</td><td>Yes</td><td></td><td></td></tr></tbody></table>
+
+<h3>Table 3: Underperformers (Negative Residuals from Column 5)</h3>
+<table class='reg-table'><thead><tr><th>Country</th><th>Residual</th><th>Anglo</th><th>ExSov</th><th>Small</th></tr></thead><tbody><tr><td>Turkmenistan</td><td>-0.931</td><td></td><td>Yes</td><td></td></tr>
+<tr><td>Papua New Guinea</td><td>-0.690</td><td></td><td></td><td></td></tr>
+<tr><td>Tajikistan</td><td>-0.403</td><td></td><td>Yes</td><td></td></tr>
+<tr><td>Tanzania</td><td>-0.392</td><td></td><td></td><td></td></tr>
+<tr><td>Azerbaijan</td><td>-0.358</td><td></td><td>Yes</td><td></td></tr>
+<tr><td>Burundi</td><td>-0.354</td><td></td><td></td><td></td></tr>
+<tr><td>Japan</td><td>-0.347</td><td></td><td></td><td></td></tr>
+<tr><td>Uzbekistan</td><td>-0.342</td><td></td><td>Yes</td><td></td></tr>
+<tr><td>Puerto Rico</td><td>-0.329</td><td></td><td></td><td></td></tr>
+<tr><td>Finland</td><td>-0.306</td><td></td><td></td><td>Yes</td></tr></tbody></table>
+
+<p>The overperformer/underperformer lists hint at patterns. To formalize this, I coded three binary variables: <strong>Anglophone</strong> (English as primary/official language), <strong>Ex-Soviet</strong> (post-Soviet states), and <strong>Small open economy</strong> (population &lt;10M, high trade/GDP). Then regressed the residuals from Column (5) on these dummies:</p>
+
+<h3>Table 4: What Predicts Overperformance?</h3>
+<table class='reg-table'><thead><tr><th>Variable</th><th>Coefficient</th><th>Std. Error</th><th>p-value</th><th> </th></tr></thead><tbody><tr><td>(Intercept)</td><td>-0.009</td><td>0.023</td><td>0.713</td><td></td></tr>
+<tr><td>is_anglophone</td><td> 0.078</td><td>0.058</td><td>0.176</td><td></td></tr>
+<tr><td>is_ex_soviet</td><td>-0.065</td><td>0.065</td><td>0.314</td><td></td></tr>
+<tr><td>is_small_open</td><td> 0.030</td><td>0.053</td><td>0.571</td><td></td></tr></tbody></table>
+<p class="sig-note">Dependent variable: residuals from Column (5) model. N = 127, R² = 0.029</p>
+
+<p>The Anglophone coefficient is positive and borderline significant (p ≈ 0.08). English-speaking countries use Claude more than fundamentals predict—unsurprising given Claude's English-first training.</p>
+
+<p>The ex-Soviet coefficient is essentially zero, which hides interesting within-group variation. Georgia (+0.59), Armenia (+0.49), and Ukraine (+0.44) are among the biggest overperformers globally—countries with strong Soviet-era technical education and active tech diasporas. But Turkmenistan (-1.65) is by far the biggest underperformer in the dataset, dragging down the group average. That's mechanical though: you can't use Claude if you can't access it. When you exclude restricted-internet countries, the ex-Soviet STEM education story would likely show up.</p>
+
+<img src="figures/gdp_residuals.png" alt="GDP residuals">
+
+<h2>Survey vs. revealed preference</h2>
+
+<p>This is where it gets strange. BCG surveyed 20 countries about ChatGPT usage. I matched this to the Claude data.</p>
+
+<p class="stat">Correlation between self-reported AI use and actual Claude usage: <strong>r = -0.43</strong></p>
+
+<p>Negative. India reports the highest ChatGPT adoption (45%) but has low Claude usage per capita. The pattern holds across emerging markets.</p>
+
+<p>The obvious objection: ChatGPT ≠ Claude. Maybe there's product substitution—emerging markets use ChatGPT, not Claude. That's plausible. But the magnitude of divergence is still striking. There may also be survey response effects—a literature on over-reporting of aspirational behaviors in certain survey contexts.</p>
+
+<p>I don't want to over-claim here. The data sources aren't measuring the same thing. But it's a pattern worth flagging for anyone doing AI adoption forecasting from survey data.</p>
+
+<img src="figures/survey_vs_actual_usage.png" alt="Survey vs actual">
+
+<h2>The attitude paradox</h2>
+
+<p>Ipsos tracks whether people feel "excited" or "nervous" about AI. Natural hypothesis: excitement predicts adoption.</p>
+
+<p class="stat">Correlation between AI excitement and Claude usage: <strong>r = -0.6</strong></p>
+
+<p>Also negative. Thailand is 80% excited, low usage. Australia is 40% excited/69% nervous, high usage.</p>
+
+<p>This is probably confounded by development level. Rich countries are both more skeptical of technology hype and better positioned to use the technology. The skeptics with infrastructure outadopt the enthusiasts without it. Standard stuff, but worth stating explicitly since it cuts against a natural assumption.</p>
+
+<img src="figures/perception_quadrant.png" alt="Perception quadrant">
+
+<h2>Automation vs. augmentation</h2>
+
+<p>This is maybe the most interesting finding. The AEI data classifies each conversation as "automation" (Claude does the task) vs "augmentation" (Claude helps with the task). I assumed this would be roughly constant across countries. It's really not.</p>
+
+<p class="stat">Correlation between GDP and automation rate: <strong>r = -0.83</strong></p>
+
+<p>That's a huge effect for cross-country work. Poorer countries use Claude to replace tasks; richer countries use it to enhance them.</p>
+
+<h3>Highest Automation</h3>
+<table class='reg-table'><thead><tr><th>Country</th><th>Automation %</th><th>Augmentation %</th></tr></thead><tbody><tr><td>Pakistan</td><td>64.1</td><td>35.9</td></tr>
+<tr><td>Brazil</td><td>63.9</td><td>36.1</td></tr>
+<tr><td>Rwanda</td><td>62.7</td><td>37.3</td></tr>
+<tr><td>Benin</td><td>62.3</td><td>37.7</td></tr>
+<tr><td>Cambodia</td><td>61.1</td><td>38.9</td></tr></tbody></table>
+
+<h3>Highest Augmentation</h3>
+<table class='reg-table'><thead><tr><th>Country</th><th>Automation %</th><th>Augmentation %</th></tr></thead><tbody><tr><td>Japan</td><td>43.3</td><td>56.7</td></tr>
+<tr><td>Norway</td><td>43.9</td><td>56.1</td></tr>
+<tr><td>Denmark</td><td>44.1</td><td>55.9</td></tr>
+<tr><td>South Korea</td><td>44.5</td><td>55.5</td></tr>
+<tr><td>Finland</td><td>44.6</td><td>55.4</td></tr></tbody></table>
+
+<h3>The Quadrants</h3>
+<table class='reg-table'><thead><tr><th>Quadrant</th><th>Countries</th><th>Avg Auto %</th><th>Avg GDP</th></tr></thead><tbody><tr><td>High GDP + High Auto</td><td> 6</td><td>54.5</td><td>$34k</td></tr>
+<tr><td>High GDP + Low Auto (Augmenters)</td><td>38</td><td>47.3</td><td>$64k</td></tr>
+<tr><td>Low GDP + High Auto (Substituters)</td><td>38</td><td>57.1</td><td>$6k</td></tr>
+<tr><td>Low GDP + Low Auto</td><td> 6</td><td>49.1</td><td>$14k</td></tr></tbody></table>
+
+<p>The "Low GDP + High Automation" quadrant is the labor substitution story: Claude as a force multiplier for scarce skilled labor. The "High GDP + Low Automation" quadrant is the productivity enhancement story: Claude as a collaborator for already-productive workers.</p>
+
+<img src="figures/gdp_vs_automation.png" alt="GDP vs automation">
+
+<h3>Testing the theories</h3>
+
+<p>A few candidate explanations, not mutually exclusive. Can we separate them empirically?</p>
+
+<p><strong>Labor costs (GDP).</strong> Baseline story: in high-wage economies, the constraint is productivity per worker. In lower-wage economies, the constraint is capacity. GDP is the proxy.</p>
+
+<p><strong>Labor scarcity (aging).</strong> Countries with older populations have tighter labor markets, which might push toward augmentation (making existing workers more productive) rather than automation. Population 65+ is the proxy.</p>
+
+<p><strong>Task composition (RTI).</strong> Users in emerging markets may disproportionately be doing tasks that are more automatable. We can test this with the IMF's Routine Task Intensity index—countries with more routine jobs should automate more.</p>
+
+<h3>Table: Decomposing Automation Rate</h3>
+<table class='reg-table'><thead><tr><th></th><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th></tr></thead><tbody><tr><td>Log GDP per capita</td><td>-8.02***</td><td>-6.03***</td><td>-8.81***</td><td>-6.58***</td></tr>
+<tr><td>Population 65+ (%)</td><td></td><td>-0.19***</td><td></td><td>-0.21***</td></tr>
+<tr><td>Routine task intensity</td><td></td><td></td><td>-1.7</td><td>-0.84</td></tr></tbody></table>
+<table class='reg-table'><thead><tr><th></th><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th></tr></thead><tbody><tr><td>N</td><td>88</td><td>87</td><td>76</td><td>76</td></tr>
+<tr><td>R²</td><td>0.682</td><td>0.707</td><td>0.703</td><td>0.737</td></tr></tbody></table>
+<p class="sig-note">Dependent variable: automation %. * p < 0.1, ** p < 0.05, *** p < 0.01. Columns (3)-(4) restricted to countries with RTI data (Lewandowski et al. 2022).</p>
+
+<p>GDP does most of the work—R² of ~0.68 in Column (1) is remarkably high for cross-country stuff. Adding aging improves fit somewhat; RTI (routine task intensity) doesn't add much beyond GDP. This suggests the labor cost story is the main driver rather than task composition per se.</p>
+
+<p>The implication: "how AI affects work" depends on development level. The job-replacement frame is more accurate in emerging markets; the productivity-enhancement frame is more accurate in high-income contexts. Both can be true simultaneously.</p>
+
+<h2>Takeaways</h2>
+
+<p>Keeping it brief:</p>
+
+<p><strong>Demographics seem to matter.</strong> The fertility/aging story is robust enough to note, even if the mechanism is fuzzy. Labor-scarce societies adopt AI tools faster. File this under "intuitive but nice to see in data."</p>
+
+<p><strong>Stated ≠ revealed.</strong> Country-level surveys on AI enthusiasm don't track actual usage. If you're forecasting AI adoption from attitude data, maybe apply a discount.</p>
+
+<p><strong>How > whether.</strong> The automation/augmentation split is arguably more interesting than adoption levels. "AI adoption" isn't one thing. The same tool gets used very differently depending on context.</p>
+
+<p><strong>Development econ still works.</strong> Most of the cross-country variation is explained by the usual suspects: income, infrastructure, institutions. AI doesn't require new theory—it slots into existing frameworks about technology diffusion. Which is maybe reassuring.</p>
+
+<hr>
+
+<p>Anyway. The dataset is cool, and I'm glad Anthropic released it. More companies should do this kind of thing—there's not much comparable public data on actual AI usage patterns. The patterns here are preliminary, and I'd want more time periods and better controls before betting on any specific coefficient. But the broad strokes seem like they're probably real.</p>
+
+<p>If anyone has ideas for extending this or spots errors, I'm reachable at <a href="mailto:t6aguirre@gmail.com">t6aguirre@gmail.com</a> or <a href="https://twitter.com/t6aguirre">@t6aguirre</a>.</p>
+
+<hr>
+
+<p style="font-size: 0.9em; color: #555;"><strong>Suggested citation:</strong> Aguirre, T. (2025). "What Predicts Claude Usage Across Countries? Some Curious Patterns." Informal research note. Available at: [this URL]</p>
+
+<h2>References</h2>
+
+<div class="references">
+<p>Anthropic. (2025). <em>The Anthropic Economic Index: September 2025 Report</em>. https://www.anthropic.com/research/anthropic-economic-index-september-2025-report</p>
+
+<p>a16z. (2025). <em>How 100 Enterprise CIOs Are Building and Buying Gen AI in 2025</em>. Andreessen Horowitz. https://a16z.com/ai-enterprise-2025/</p>
+
+<p>BCG. (2023). <em>Global Consumer Sentiment Survey: AI Adoption</em>. Boston Consulting Group.</p>
+
+<p>Fradkin, A. (2025). <em>Demand for LLMs: Descriptive Evidence on Substitution, Market Expansion, and Multihoming</em>. Working paper, Boston University. https://empiricrafting.substack.com/p/one-llm-to-rule-them-all</p>
+
+<p>ILO. (2025). <em>Generative AI and Jobs: A Refined Global Index of Occupational Exposure</em>. Working Paper No. 140. https://www.ilo.org/publications/generative-ai-and-jobs-refined-global-index-occupational-exposure</p>
+
+<p>Lewandowski, P., Park, A., Hardy, W., Du, Y., & Wu, S. (2022). Technology, Skills, and Globalization: Explaining International Differences in Routine and Nonroutine Work Using Survey Data. <em>The World Bank Economic Review</em>, 36(3), 670-686. https://doi.org/10.1093/wber/lhac005</p>
+
+<p>Ipsos. (2024). <em>Ipsos AI Monitor 2024: Changing Attitudes and Feelings About AI</em>. https://www.ipsos.com/en/ipsos-ai-monitor-2024</p>
+
+<p>UNDP. (2024). <em>Human Development Report 2024</em>. New York: United Nations Development Programme. https://hdr.undp.org/</p>
+
+<p>EF Education First. (2024). <em>EF English Proficiency Index 2024</em>. https://www.ef.com/epi/</p>
+
+<p>World Bank. (2024). <em>World Development Indicators</em>. Washington, DC: World Bank Group. https://databank.worldbank.org/source/world-development-indicators</p>
+</div>
+
+<p class="footnote"><em>Methods: LASSO and elastic net regression with 10-fold cross-validation, n = 127 countries with complete data. Includes World Bank WDI indicators, UNDP HDI, Lewandowski et al. (2022) Routine Task Intensity index (102 countries), EF English Proficiency Index, and GDP growth volatility (5-year std. dev.). Replication code available on request.</em></p>
+
+</body>
+</html>

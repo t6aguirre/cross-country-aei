@@ -1,0 +1,418 @@
+---
+title: "What Predicts Claude Usage Across Countries? Some Curious Patterns"
+author: ""
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 6)
+options(digits = 3)
+```
+
+```{r libraries}
+library(tidyverse)
+library(glmnet)
+library(knitr)
+library(kableExtra)
+library(broom)
+```
+
+Anthropic recently released their Economic Index—a genuinely interesting dataset on how people use Claude across 166 countries. I spent a weekend playing with the data and found some patterns that surprised me. Or at least, patterns I didn't expect going in.
+
+## The obvious stuff first
+
+The report itself notes that Claude usage correlates with GDP, internet access, and institutional quality. No shock there. Rich countries with good infrastructure use AI products more. Development economics 101.
+
+But here's what bugged me: all these variables are correlated with *each other*. High-GDP countries have better governance. Better governance correlates with R&D spending. R&D spending correlates with education. And so on. Classic multicollinearity problem.
+
+So which factors actually matter independently? You can't really answer that by just running correlations.
+
+## The regression approach
+
+```{r load-data}
+# Load data
+read_wb <- function(pattern, var_name) {
+  file <- list.files(pattern = pattern)[1]
+  if (is.na(file)) return(NULL)
+  df <- read_csv(file, skip = 4, show_col_types = FALSE)
+  df %>%
+    select(`Country Code`, starts_with("20")) %>%
+    pivot_longer(-`Country Code`, names_to = "year", values_to = "value") %>%
+    filter(!is.na(value)) %>%
+    group_by(`Country Code`) %>%
+    slice_max(year, n = 1) %>%
+    ungroup() %>%
+    select(geo_id = `Country Code`, !!var_name := value)
+}
+
+aei <- read_csv("aei_geo.csv", show_col_types = FALSE)
+ai_usage <- aei %>%
+  filter(geography == "country", facet == "country",
+         variable %in% c("usage_per_capita", "gdp_per_working_age_capita")) %>%
+  select(geo_id, geo_name, variable, value) %>%
+  pivot_wider(names_from = variable, values_from = value) %>%
+  filter(!is.na(usage_per_capita) & usage_per_capita > 0)
+
+vars_list <- list(
+  internet = read_wb("API_IT.NET.USER", "internet"),
+  rule_of_law = read_wb("API_RL.EST", "rule_of_law"),
+  corruption = read_wb("API_CC.EST", "corruption"),
+  gov_effect = read_wb("API_GE.EST", "gov_effectiveness"),
+  regulatory = read_wb("API_RQ.EST", "regulatory_quality"),
+  tertiary = read_wb("API_SE.TER.ENRR", "tertiary_edu"),
+  rd = read_wb("API_GB.XPD.RSDV", "rd_spending"),
+  fertility = read_wb("API_SP.DYN.TFRT", "fertility"),
+  aging = read_wb("API_SP.POP.65UP", "aging"),
+  gini = read_wb("API_SI.POV.GINI", "gini"),
+  trade = read_wb("API_NE.TRD.GNFS", "trade_openness"),
+  hightech = read_wb("API_TX.VAL.TECH", "hightech_exports"),
+  unemployment = read_wb("API_SL.UEM.TOTL", "unemployment"),
+  urban = read_wb("API_SP.URB.TOTL.IN.ZS", "urban"),
+  life_exp = read_wb("API_SP.DYN.LE00", "life_expectancy"),
+  mobile = read_wb("API_IT.CEL.SETS.P2", "mobile"),
+  patents = read_wb("API_IP.PAT.RESD", "patents"),
+  female_labor = read_wb("API_SL.TLF.CACT.FE", "female_labor")
+)
+
+full_data <- ai_usage
+for (v in vars_list) {
+  if (!is.null(v)) full_data <- left_join(full_data, v, by = "geo_id")
+}
+
+full_data <- full_data %>%
+  mutate(
+    log_usage = log10(usage_per_capita),
+    log_gdp = log10(gdp_per_working_age_capita)
+  )
+
+predictor_names <- c("log_gdp", "internet", "rule_of_law", "corruption",
+                     "gov_effectiveness", "regulatory_quality", "tertiary_edu",
+                     "rd_spending", "fertility", "aging", "gini",
+                     "trade_openness", "hightech_exports", "unemployment",
+                     "urban", "life_expectancy", "mobile", "patents", "female_labor")
+
+model_data <- full_data %>%
+  select(geo_name, log_usage, all_of(predictor_names)) %>%
+  filter(complete.cases(.))
+```
+
+I threw 19 country-level variables into a series of regressions. Let's start with the simple OLS to see what we're working with.
+
+### Table 1: OLS Regression Results
+
+```{r ols-models}
+# Simple models
+m1 <- lm(log_usage ~ log_gdp, data = model_data)
+m2 <- lm(log_usage ~ log_gdp + internet + regulatory_quality, data = model_data)
+m3 <- lm(log_usage ~ log_gdp + fertility + aging + regulatory_quality, data = model_data)
+m4 <- lm(log_usage ~ log_gdp + fertility + aging + regulatory_quality + rd_spending + life_expectancy, data = model_data)
+
+# Full model
+full_formula <- as.formula(paste("log_usage ~", paste(predictor_names, collapse = " + ")))
+m5 <- lm(full_formula, data = model_data)
+
+# Create comparison table
+extract_stats <- function(model, name) {
+  s <- summary(model)
+  tibble(
+    Model = name,
+    N = nobs(model),
+    `R²` = round(s$r.squared, 3),
+    `Adj. R²` = round(s$adj.r.squared, 3),
+    `F-stat` = round(s$fstatistic[1], 1),
+    `p-value` = format.pval(pf(s$fstatistic[1], s$fstatistic[2], s$fstatistic[3], lower.tail = FALSE), digits = 3)
+  )
+}
+
+model_comparison <- bind_rows(
+  extract_stats(m1, "(1) GDP only"),
+  extract_stats(m2, "(2) + Internet, Regulatory"),
+  extract_stats(m3, "(3) + Fertility, Aging"),
+  extract_stats(m4, "(4) Core model"),
+  extract_stats(m5, "(5) Kitchen sink")
+)
+
+kable(model_comparison, caption = "Model Comparison: Explaining Log Claude Usage per Capita") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+```{r coef-table}
+# Coefficient table for main models
+tidy_m4 <- tidy(m4, conf.int = TRUE) %>%
+  mutate(model = "Core (4)")
+tidy_m5 <- tidy(m5, conf.int = TRUE) %>%
+  mutate(model = "Full (5)")
+
+coef_table <- bind_rows(tidy_m4, tidy_m5) %>%
+  filter(term != "(Intercept)") %>%
+  select(term, estimate, std.error, statistic, p.value, model) %>%
+  mutate(
+    estimate = round(estimate, 3),
+    std.error = round(std.error, 3),
+    statistic = round(statistic, 2),
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      p.value < 0.1 ~ "†",
+      TRUE ~ ""
+    )
+  ) %>%
+  pivot_wider(
+    id_cols = term,
+    names_from = model,
+    values_from = c(estimate, std.error, sig)
+  )
+
+kable(coef_table,
+      col.names = c("Variable", "Coef.", "SE", "Sig.", "Coef.", "SE", "Sig."),
+      caption = "Table 2: OLS Coefficients (DV: Log Usage per Capita)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+  add_header_above(c(" " = 1, "Core Model (4)" = 3, "Full Model (5)" = 3)) %>%
+  footnote(general = "† p < 0.1, * p < 0.05, ** p < 0.01, *** p < 0.001")
+```
+
+The kitchen sink model (5) has some issues—lots of collinear predictors, coefficients jumping around. This is where LASSO helps.
+
+### Table 3: LASSO Variable Selection
+
+```{r lasso}
+X <- as.matrix(model_data[, predictor_names])
+y <- model_data$log_usage
+X_scaled <- scale(X)
+
+set.seed(42)
+cv_lasso <- cv.glmnet(X_scaled, y, alpha = 1, nfolds = 10)
+
+lasso_coef <- coef(cv_lasso, s = "lambda.min")
+lasso_df <- data.frame(
+  Variable = rownames(lasso_coef)[-1],
+  Coefficient = as.vector(lasso_coef)[-1]
+) %>%
+  mutate(
+    Selected = ifelse(Coefficient != 0, "Yes", "No"),
+    `Abs. Coef.` = abs(Coefficient)
+  ) %>%
+  arrange(desc(`Abs. Coef.`))
+
+kable(lasso_df %>% filter(Selected == "Yes") %>% select(-Selected, -`Abs. Coef.`),
+      digits = 3,
+      caption = "LASSO-Selected Variables (λ = λ.min from 10-fold CV)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+```{r lasso-plot, fig.cap="LASSO variable importance"}
+lasso_df %>%
+  filter(Coefficient != 0) %>%
+  mutate(Variable = fct_reorder(Variable, abs(Coefficient))) %>%
+  ggplot(aes(x = Coefficient, y = Variable, fill = Coefficient > 0)) +
+  geom_col() +
+  geom_vline(xintercept = 0) +
+  scale_fill_manual(values = c("#ef4444", "#10b981"), guide = "none") +
+  labs(
+    title = "Not having babies: the biggest predictor of Claude usage",
+    subtitle = sprintf("LASSO R² = %.1f%% | Standardized coefficients",
+                       cor(y, predict(cv_lasso, X_scaled, s = "lambda.min"))^2 * 100),
+    x = "Standardized Coefficient",
+    y = NULL
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+**Fertility rate came out on top.** Coefficient of -0.18, standardized. Countries where people have fewer kids seem to use Claude more, controlling for everything else.
+
+I'll be honest, I didn't expect this. GDP and regulatory quality are in there too (makes sense), along with aging population, R&D spending, and life expectancy. But fertility appears to be the strongest single predictor, at least in this specification.
+
+What got dropped? Internet access. Tertiary education. Corruption control. These are correlated with the winners but don't seem to add independent explanatory power once you control for the core demographic and institutional factors. Though of course with country-level data and ~100 observations, I wouldn't put too much weight on any single coefficient.
+
+## Who's punching above their weight?
+
+```{r residuals}
+# Simple GDP model for residuals
+gdp_model <- lm(log_usage ~ log_gdp, data = model_data)
+model_data$residual <- residuals(gdp_model)
+
+overperformers <- model_data %>%
+  arrange(desc(residual)) %>%
+  head(10) %>%
+  select(Country = geo_name, `Log GDP` = log_gdp, `Log Usage` = log_usage, Residual = residual)
+
+underperformers <- model_data %>%
+  arrange(residual) %>%
+  head(10) %>%
+  select(Country = geo_name, `Log GDP` = log_gdp, `Log Usage` = log_usage, Residual = residual)
+
+kable(overperformers, digits = 2, caption = "Countries Using Claude More Than GDP Predicts") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+kable(underperformers, digits = 2, caption = "Countries Using Claude Less Than GDP Predicts") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+There's maybe a pattern here: post-Soviet states with strong technical education traditions, South Asian countries with large English-speaking tech diasporas, and small countries with outsized digital infrastructure investments. Though I'm speculating.
+
+The underperformers are perhaps more telling: oil states and countries with restricted internet access. Turkmenistan is the biggest underperformer by far, which... makes sense.
+
+## The survey data tells a different story
+
+```{r survey-data}
+survey <- read_csv("ai_usage_survey.csv", show_col_types = FALSE)
+perception <- read_csv("ai_perception.csv", show_col_types = FALSE)
+
+usage <- aei %>%
+  filter(variable == "usage_per_capita", geography == "country", facet == "country") %>%
+  select(geo_id, geo_name, claude_usage = value) %>%
+  filter(!is.na(claude_usage) & claude_usage > 0)
+
+combined <- survey %>%
+  inner_join(usage, by = "geo_id") %>%
+  left_join(perception %>% select(geo_id, excited, nervous), by = "geo_id") %>%
+  mutate(log_claude = log10(claude_usage))
+
+cor_survey <- cor(combined$chatgpt_adoption_pct, combined$log_claude)
+```
+
+BCG ran a survey in 2023 asking people across 21 countries whether they use ChatGPT. I merged this with the Claude usage data.
+
+The correlation is negative. r = `r round(cor_survey, 2)`.
+
+```{r survey-plot, fig.cap="Self-reported AI usage vs actual Claude usage"}
+ggplot(combined, aes(x = chatgpt_adoption_pct, y = log_claude)) +
+  geom_point(size = 3, alpha = 0.7, color = "#3b82f6") +
+  geom_smooth(method = "lm", se = TRUE, color = "#dc2626", linetype = "dashed") +
+  geom_text(aes(label = geo_id), vjust = -1, size = 3) +
+  labs(
+    title = "Self-Reported AI Adoption vs Actual Claude Usage",
+    subtitle = sprintf("r = %.2f — what people say vs what they (apparently) do", cor_survey),
+    x = "% saying they use ChatGPT (BCG Survey 2023)",
+    y = "Actual Claude usage per capita (log scale)"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+India tops the self-reported charts at 45% claiming ChatGPT usage. Their actual Claude usage per capita is near the bottom. Indonesia, Brazil, South Africa—same pattern. High claimed adoption, low revealed preference (at least for Claude).
+
+I'm not entirely sure what to make of this. Part of it is probably ChatGPT vs. Claude market share differences—these aren't measuring the same thing. Part might be survey response bias. But the magnitude of the gap is striking enough to mention.
+
+## The attitude paradox
+
+```{r attitude}
+combined_att <- combined %>% filter(!is.na(excited))
+cor_excited <- cor(combined_att$excited, combined_att$log_claude)
+```
+
+Ipsos surveys people on whether they feel "excited" or "nervous" about AI. I expected excitement to correlate with adoption.
+
+It doesn't, really. The relationship is negative (r = `r round(cor_excited, 2)`).
+
+```{r attitude-plot, fig.cap="Countries nervous about AI use it more"}
+ggplot(combined_att, aes(x = excited - nervous, y = log_claude)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_point(aes(color = excited - nervous > 0), size = 4, alpha = 0.7) +
+  geom_text(aes(label = geo_id), vjust = -1, size = 3) +
+  geom_smooth(method = "lm", se = TRUE, color = "#3b82f6") +
+  scale_color_manual(values = c("#ef4444", "#10b981"),
+                     labels = c("More nervous", "More excited"),
+                     name = NULL) +
+  labs(
+    title = "The Attitude Paradox",
+    subtitle = "Countries nervous about AI appear to use it more (or at least use Claude more)",
+    x = "Net AI sentiment (% excited − % nervous)",
+    y = "Claude usage per capita (log scale)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "top")
+```
+
+Thailand: 80% excited about AI. Near the bottom of Claude usage.
+Australia: 40% excited, 69% nervous. Near the top of usage.
+
+This probably isn't causal in either direction. It's likely a confounder story: wealthy, educated populations in mature economies tend to be both (a) more skeptical of new technologies and (b) better positioned to access them. The skeptics have the credit cards and the infrastructure. The enthusiasts don't, or at least not to the same degree.
+
+## Rich countries augment, poor countries automate
+
+```{r automation}
+auto_aug <- aei %>%
+  filter(variable %in% c("automation_pct", "augmentation_pct"),
+         geography == "country") %>%
+  select(geo_id, geo_name, variable, value) %>%
+  pivot_wider(names_from = variable, values_from = value) %>%
+  filter(!is.na(automation_pct))
+
+usage_count <- aei %>%
+  filter(variable == "usage_count", geography == "country", facet == "country") %>%
+  select(geo_id, usage_count = value)
+
+gdp_data <- full_data %>% select(geo_id, log_gdp)
+
+auto_aug <- auto_aug %>%
+  left_join(usage_count, by = "geo_id") %>%
+  left_join(gdp_data, by = "geo_id") %>%
+  filter(usage_count > 500, !is.na(log_gdp))
+
+cor_auto_gdp <- cor(auto_aug$log_gdp, auto_aug$automation_pct)
+```
+
+This one surprised me most, I think. The AEI data includes whether each conversation is "automation" (replacing human work) or "augmentation" (enhancing human work). I expected this to be roughly constant across countries. It's not.
+
+```{r auto-table}
+auto_aug %>%
+  arrange(desc(automation_pct)) %>%
+  head(10) %>%
+  select(Country = geo_name, `Automation %` = automation_pct, `Augmentation %` = augmentation_pct) %>%
+  kable(digits = 1, caption = "Highest Automation Countries") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+auto_aug %>%
+  arrange(desc(augmentation_pct)) %>%
+  head(10) %>%
+  select(Country = geo_name, `Automation %` = automation_pct, `Augmentation %` = augmentation_pct) %>%
+  kable(digits = 1, caption = "Highest Augmentation Countries") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+```{r auto-plot, fig.cap="GDP vs automation rate"}
+ggplot(auto_aug, aes(x = log_gdp, y = automation_pct)) +
+  geom_point(size = 3, alpha = 0.7, color = "#3b82f6") +
+  geom_smooth(method = "lm", se = TRUE, color = "#dc2626") +
+  geom_text(aes(label = geo_id), vjust = -1, size = 2.5) +
+  labs(
+    title = sprintf("Wealth vs Automation (r = %.2f)", cor_auto_gdp),
+    subtitle = "Poorer countries appear to use Claude more for automation",
+    x = "Log GDP per capita",
+    y = "% Automation"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+The correlation between GDP and automation is **`r round(cor_auto_gdp, 2)`**. That's... pretty strong for cross-country data.
+
+Pakistan, Brazil, and Rwanda have the highest automation rates (~63%). Users there seem to be asking Claude to do things *for* them—write the code, draft the document, complete the task.
+
+Japan, Norway, and Denmark have the highest augmentation rates (~56%). Users there seem to be asking Claude to help them do things *better*—explain concepts, review their work, suggest improvements.
+
+The interpretation maybe writes itself: in labor-abundant economies, the marginal value of AI might be replacing expensive skilled labor. In labor-scarce, high-wage economies, the value is making existing workers more productive. Labor economics 101, possibly manifesting in LLM usage patterns. Though I'd want more data before making strong claims.
+
+## What I think this means
+
+A few tentative conclusions, with appropriate hedging:
+
+**Demographics seem to matter more than I expected.** The fertility/aging story is real and persists across specifications. Older, shrinking populations adopt AI tools at higher rates, maybe. The automation/augmentation split might reinforce this: labor-scarce rich countries augment, labor-abundant poor countries automate. Classic factor substitution, potentially playing out in real-time LLM usage.
+
+**How countries use AI differs as much as whether they use it.** The collaboration style differences are striking, if we take the data at face value. Japan's learning-oriented usage vs. Brazil's directive usage could suggest fundamentally different mental models of what an AI assistant is for. Product implications are non-trivial, if this holds up.
+
+**Survey data on AI adoption should probably be treated skeptically.** The gap between claimed and revealed behavior is large enough to matter for policy and market analysis. Or there's something weird about comparing ChatGPT surveys to Claude usage.
+
+**Attitudes don't predict behavior here.** At least not in the simple way you'd expect. Being excited about AI doesn't seem to translate to using it, at the country level. Access and infrastructure dominate, as usual.
+
+---
+
+Anyway, this was a fun dataset to dig into. Anthropic deserves credit for releasing it—there's not much public data on actual AI usage patterns at this granularity. Would be curious to see how these patterns evolve over time.
+
+*Methods: LASSO and elastic net regression with 10-fold CV, `r nrow(model_data)` countries with complete data. Main data sources: Anthropic Economic Index, World Bank WDI, Ipsos AI Monitor 2024, BCG Global Consumer Survey 2023.*
