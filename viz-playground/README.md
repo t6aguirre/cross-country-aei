@@ -2,6 +2,8 @@
 
 Patterns in the Anthropic Economic Index
 
+> **This is a vibe-coded research note.** It was mostly Claude-generated and put together over a weekend. I don't know what I'm going to do with it — it might become a paper, stay a blog post, or go nowhere. Treat it accordingly.
+
 ## Overview
 
 This project analyzes Anthropic's Economic Index data alongside World Bank development indicators, survey data, and other sources to understand patterns in AI adoption at the country level. The analysis is exploratory—pattern-finding rather than hypothesis testing.
